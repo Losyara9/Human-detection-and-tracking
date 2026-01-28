@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Human Detection & Tracking Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Human Detection & Tracking Dashboard</h1>
+    <div class="sub">Загрузите видео → отметьте 4 точки пола → смотрите видеопоток, 2D-карту и статистику → скачивайте результаты и отчёты.</div>
+  </header>
+
+  <div class="wrap">
+    <div class="card">
+      <h2>1) Загрузка и калибровка</h2>
+      <div class="col">
+        <input type="file" id="videoFile" accept="video/*">
+        <div class="row">
+          <button class="primary" id="btnUpload">Загрузить</button>
+          <span class="pill" id="jobPill">Нет задания</span>
+        </div>
+        <div class="small">После загрузки отметьте 4 точки на первом кадре по порядку: <b>TL → TR → BR → BL</b>.</div>
+        <canvas id="calibCanvas" width="800" height="450"></canvas>
+        <div class="row">
+          <button class="warn" id="btnResetPoints" disabled>Сбросить точки</button>
+          <button class="good" id="btnCalibrateStart" disabled>Калибровать (пиксельный масштаб) и старт</button>
+        </div>
+        <div class="pointList" id="pointsText">Точки: []</div>
+      </div>
+
+      <hr style="border:0;border-top:1px solid var(--border);margin:14px 0;">
+
+      <h2>Размеры области</h2>
+      <div class="col">
+        <!-- Опция 1: Реальные размеры -->
+        <div class="row" style="align-items: flex-start;">
+          <input type="radio" id="scaleReal" name="scaleType" value="real" style="margin-top: 3px;">
+          <label for="scaleReal" style="cursor: pointer; margin-left: 8px;">
+            <div style="font-weight: 600; color: var(--text);">Известны реальные размеры</div>
+            <div class="small" style="margin-top: 4px;">Введите ширину и высоту в метрах для точных скорости и дистанции</div>
+          </label>
+        </div>
+
+        <div id="realDimensionsInput" style="display: none; margin-left: 28px; margin-top: 10px; margin-bottom: 15px;">
+          <div class="row" style="gap: 15px; align-items: center;">
+            <div style="flex: 1;">
+              <div class="small" style="margin-bottom: 4px; color: var(--muted);">Ширина (м):</div>
+              <input type="number" id="realWidth" min="0.1" step="0.1" value="1.0"
+                     style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--border);
+                            background: rgba(255,255,255,0.05); color: var(--text);">
+            </div>
+            <div style="flex: 1;">
+              <div class="small" style="margin-bottom: 4px; color: var(--muted);">Высота (м):</div>
+              <input type="number" id="realHeight" min="0.1" step="0.1" value="1.5"
+                     style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--border);
+                            background: rgba(255,255,255,0.05); color: var(--text);">
+            </div>
+          </div>
+          <div class="small" style="margin-top: 8px; color: var(--muted);">
+            Совет: измерьте прямоугольную область, ограниченную четырьмя точками калибровки
+          </div>
+        </div>
+
+        <!-- Опция 2: Пиксельные единицы -->
+        <div class="row" style="align-items: flex-start; margin-top: 10px;">
+          <input type="radio" id="scalePixel" name="scaleType" value="pixel" checked style="margin-top: 3px;">
+          <label for="scalePixel" style="cursor: pointer; margin-left: 8px;">
+            <div style="font-weight: 600; color: var(--text);">Размеры неизвестны</div>
+            <div class="small" style="margin-top: 4px;">Использовать пиксельные единицы (только относительные измерения)</div>
+          </label>
+        </div>
+      </div>
+
+      <h2>Статистика в реальном времени</h2>
+      <div class="kv">
+        <div><div class="k">Статус</div><div class="v" id="statStatus">—</div></div>
+        <div><div class="k">FPS обработки</div><div class="v" id="statFps">—</div></div>
+        <div><div class="k">Людей (сейчас)</div><div class="v" id="statPeople">—</div></div>
+        <div><div class="k">Людей (макс.)</div><div class="v" id="statPeopleMax">—</div></div>
+        <div><div class="k">Кадр</div><div class="v" id="statFrame">—</div></div>
+        <div><div class="k">Всего кадров</div><div class="v" id="statTotal">—</div></div>
+      </div>
+      <div class="small" style="margin-top:10px;">Документация API: <a href="/docs" target="_blank">Swagger docs</a></div>
+    </div>
+
+    <div class="card">
+      <div class="viewer">
+        <div>
+          <div class="panelTitle">
+            <h2 style="margin:0;">Видеопоток (bbox и точки стоп)</h2>
+            <div class="panelActions">
+              <button class="iconBtn" id="btnFsVideo" title="Полный экран">Полный экран</button>
+              <span class="pill" id="pillVideo">Ожидание</span>
+            </div>
+          </div>
+          <div class="frameBox" id="boxVideo"><img id="imgVideo" alt="Видеопоток"/></div>
+        </div>
+        <div>
+          <div class="panelTitle">
+            <h2 style="margin:0;">2D карта пола (траектории)</h2>
+            <div class="panelActions">
+              <button class="iconBtn" id="btnZoomOut" title="Уменьшить">−</button>
+              <button class="iconBtn" id="btnZoomReset" title="Сброс масштаба">Сброс</button>
+              <button class="iconBtn" id="btnZoomIn" title="Увеличить">+</button>
+              <button class="iconBtn primary" id="btnFsMap" title="Полный экран">Полный экран</button>
+              <span class="pill" id="pillMap">Ожидание</span>
+            </div>
+          </div>
+          <div class="frameBox" id="boxMap"><img class="zoomable" id="imgMap" alt="2D карта"/></div>
+        </div>
+      </div>
+
+      <hr style="border:0;border-top:1px solid var(--border);margin:14px 0;">
+
+      <div class="row" style="justify-content:space-between;">
+        <h2 style="margin:0;">История и загрузки</h2>
+        <div class="row">
+          <button id="btnRefreshHistory">Обновить</button>
+        </div>
+      </div>
+      <div class="small">По завершённым заданиям доступны ссылки на видео, Excel траектории и PDF-отчёт.</div>
+      <div style="margin-top:10px;overflow:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Задание</th>
+              <th>Файл</th>
+              <th>Статус</th>
+              <th>Кадров</th>
+              <th>Людей макс.</th>
+              <th>Загрузки</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody">
+            <tr><td colspan="6" class="muted">История не загружена</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

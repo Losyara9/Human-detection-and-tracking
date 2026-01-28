@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import List, Tuple
 
-class CameraCalibratior:
+class CameraCalibrator:
     def __init__(self):
         self.camera_matrix = None
         self.dist_coeffs = None

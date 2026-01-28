@@ -44,7 +44,7 @@ def main():
         type=str,
         choices=config.EXPORT_FORMATS,
         default=None,
-        help="Экспорт траекторий в формат (csv/xlsx/json/pdf)"
+        help="Экспорт траекторий в формат (xlsx/json/pdf)"
     )
     parser.add_argument(
         "--show",
@@ -414,9 +414,7 @@ def main():
             output_path = config.OUTPUT_DIR / f'{output_name}_tracks.{args.export}'
 
             try:
-                if args.expot == 'csv':
-                    exporter.export_csv(all_tracks, output_path)
-                elif args.export == 'xlsx':
+                if args.export == 'xlsx':
                     exporter.export_excel(all_tracks, output_path)
                 elif args.export == 'json':
                     exporter.export_json(all_tracks, output_path)

@@ -10,18 +10,34 @@ class HomographyTransformer:
     def __init__(self):
         self.homography_matrix = None
         self.calibrated = False
+        self.has_real_scale = False
+        self.real_width_m = 1.0
+        self.real_height_m = 1.5
 
     # калибрует гомографию по соответствиям точек
     # аргументы: список координат в изображении и карты пола, возвращает true если калибровка успешна
     def calibrate(
         self,
         image_points: List[Tuple[float, float]],
-        world_points: List[Tuple[float, float]]
+        world_points: List[Tuple[float, float]],
+        real_width_m: Optional[float] = None,
+        real_height_m: Optional[float] = None,
+        knows_real_dimensions: bool = False
     )-> bool:
 
         if len(image_points) != len(world_points) or len(image_points) < 4:
             print('Ошибка: нужно минимум 4 соответствия точек')
             return False
+
+        self.has_real_scale = knows_real_dimensions
+        if knows_real_dimensions and real_width_m and real_height_m:
+            self.real_width_m = real_width_m
+            self.real_height_m = real_height_m
+            print(f"Реальный масштаб: {real_width_m}м × {real_height_m}м")
+        else:
+            self.real_width_m = 1.0
+            self.real_height_m = 1.5
+            print("Используются относительные единицы (пиксели)")
 
         try:
             # приводим к numpy массивам
@@ -43,6 +59,14 @@ class HomographyTransformer:
         except Exception as e:
             print(f"Ошибка калибровки гомографии: {e}")
             return False
+
+    def get_scale_info(self):
+        return {
+            'has_real_scale': self.has_real_scale,
+            'real_width_m': self.real_width_m,
+            'real_height_m': self.real_height_m,
+            'units': 'meters' if self.has_real_scale else 'pixels'
+        }
 
     # преобразует одну точку из координат изображения в координаты карты
     def transform_point(
@@ -87,15 +111,28 @@ class HomographyTransformer:
             raise ValueError('Гомография еще не откалибрована')
 
         data = {
-            'homography_matrix': self.homography_matrix.tolist()
+            "homography_matrix": self.homography_matrix.tolist(),
+            "calibrated": self.calibrated,
+            "has_real_scale": self.has_real_scale,  # ДОБАВИЛИ
+            "real_width_m": self.real_width_m,  # ДОБАВИЛИ
+            "real_height_m": self.real_height_m,  # ДОБАВИЛИ
+            "version": "1.1"  # Версия для обратной совместимости
         }
 
         with open(filepath, 'w') as f:
             json.dump(data, f, indent=2)
 
     def load(self, filepath: Path):
-        with open(filepath, 'r') as f:
+        with open(filepath, "r", encoding='utf-8') as f:
             data = json.load(f)
 
-        self.homography_matrix = np.array(data['homography_matrix'])
-        self.calibrated = True
+        self.homography_matrix = np.array(data["homography_matrix"])
+        self.calibrated = data.get("calibrated", True)
+
+        self.has_real_scale = data.get("has_real_scale", False)
+        self.real_width_m = data.get("real_width_m", 1.0)
+        self.real_height_m = data.get("real_height_m", 1.5)
+
+        if "has_real_scale" not in data:
+            print("Загружена старая версия калибровки, используется относительный масштаб")
+            self.has_real_scale = False

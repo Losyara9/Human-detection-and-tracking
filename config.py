@@ -14,7 +14,9 @@ for directory in [DATA_DIR, VIDEOS_DIR, FLOOR_PLANS_DIR, OUTPUT_DIR, LOGS_DIR]:
     directory.mkdir(parents=True, exist_ok=True)
 
 # Настройки модели
-MODEL_NAME = "yolov8n.pt"  #
+_DEFAULT_YOLO = DATA_DIR / "yolo" / "yolov8n.pt"
+MODEL_PATH = os.environ.get("MODEL_PATH") or (str(_DEFAULT_YOLO) if _DEFAULT_YOLO.exists() else None)
+MODEL_NAME = "yolov8n.pt"
 CONFIDENCE_THRESHOLD = 0.5
 IOU_THRESHOLD = 0.45
 CLASS_IDS = [0]  # Класс person
@@ -82,4 +84,4 @@ CALIBRATION_AREA_WIDTH = 1.0    # исходная ширина зоны кал�
 CALIBRATION_AREA_HEIGHT = 1.5   # исходная высота зоны калибровки
 
 # Экспорт
-EXPORT_FORMATS = ["csv", "xlsx", "json", "pdf"]
+EXPORT_FORMATS = ["xlsx", "json", "pdf"]

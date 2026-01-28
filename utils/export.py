@@ -15,70 +15,8 @@ from datetime import datetime
 
 class TrajectoryExporter:
 
-
-    def export_csv(
-            self,
-            tracks: List[Dict],
-            output_path: Path,
-            world_trajectories: Optional[Dict[int, List[Tuple[int, Tuple[float, float]]]]] = None,
-            video_fps: Optional[float] = None,
-            map_width_m: Optional[float] = None,
-            map_height_m: Optional[float] = None,
-            offset_x_m: float = 0.0,
-            offset_y_m: float = 0.0,
-            knows_real_dimensions: bool = False
-    ):
-
-        data = []
-        world_trajectories = world_trajectories or {}
-        video_fps = float(video_fps or 0.0)
-        map_width_m = float(map_width_m or config.FLOOR_MAP_WIDTH_METERS)
-        map_height_m = float(map_height_m or config.FLOOR_MAP_HEIGHT_METERS)
-
-        for track in tracks:
-            track_id = track.get('track_id', -1)
-            trajectory = track.get('trajectory', [])
-            wtraj = world_trajectories.get(int(track_id), [])
-            w_by_frame = {int(fid): (float(p[0]), float(p[1])) for fid, p in wtraj}
-
-            for frame_id, bbox in trajectory:
-                x1, y1, x2, y2 = bbox
-                center_x = (x1 + x2) / 2
-                center_y = (y1 + y2) / 2
-                x_norm = None
-                y_norm = None
-                x_m = None
-                y_m = None
-                x_cal_m = None
-                y_cal_m = None
-
-                if int(frame_id) in w_by_frame:
-                    x_norm, y_norm = w_by_frame[int(frame_id)]
-                    x_m = x_norm * map_width_m
-                    y_m = y_norm * map_height_m
-                    x_cal_m = x_m - offset_x_m
-                    y_cal_m = y_m - offset_y_m
-
-                data.append({
-                    "track_id": track_id,
-                    "frame_id": frame_id,
-                    "x1": x1,
-                    "y1": y1,
-                    "x2": x2,
-                    "y2": y2,
-                    "center_x": center_x,
-                    "center_y": center_y,
-                    "x_norm": x_norm,
-                    "y_norm": y_norm,
-                    "x_m": x_m if knows_real_dimensions else None,  # ТОЛЬКО если знаем реальные размеры
-                    "y_m": y_m if knows_real_dimensions else None,
-                    "x_cal_m": x_cal_m if knows_real_dimensions else None,
-                    "y_cal_m": y_cal_m if knows_real_dimensions else None,
-                    "units": "meters" if knows_real_dimensions else "pixels",
-                })
-
-        df = pd.DataFrame(data)
-        df.to_csv(output_path, index = False)
+    def __init__(self):
+        """Инициализация экспортера."""
 
     def export_json(self, tracks: List[Dict], output_path: Path):
         with open(output_path, 'w') as f:
@@ -86,6 +24,7 @@ class TrajectoryExporter:
 
     def export_excel(
             self,
+            tracks: List[Dict],
             output_path: Path,
             world_trajectories: Optional[Dict[int, List[Tuple[int, Tuple[float, float]]]]] = None,
             video_fps: Optional[float] = None,
@@ -152,7 +91,7 @@ class TrajectoryExporter:
         summary_rows = self.build_summary_rows(
             tracks=tracks,
             world_trajectories=world_trajectories,
-            video_frps=video_fps,
+            video_fps=video_fps,
             map_width_m=map_width_m,
             map_height_m=map_height_m,
             offset_x_m=offset_x_m,
@@ -219,7 +158,7 @@ class TrajectoryExporter:
         map_width_m = float(map_width_m or config.FLOOR_MAP_WIDTH_METERS)
         map_height_m = float(map_height_m or config.FLOOR_MAP_HEIGHT_METERS)
 
-        summary_rows = self._build_summary_rows(
+        summary_rows = self.build_summary_rows(
             tracks=tracks,
             world_trajectories=world_trajectories,
             video_fps=video_fps,
@@ -291,30 +230,30 @@ class TrajectoryExporter:
             story.append(Spacer(1, 0.3 * inch))
 
             # Если треков нет
-            if not summary_rows:
-                no_data = Paragraph("<i>No tracks detected in the video</i>", styles["Normal"])
-                story.append(no_data)
-                story.append(Spacer(1, 0.2 * inch))
-
+        if not summary_rows:
+            no_data = Paragraph("<i>No tracks detected in the video</i>", styles["Normal"])
+            story.append(no_data)
             story.append(Spacer(1, 0.2 * inch))
 
-            notes_text = """
-                <b>Notes:</b><br/>
-                1. Distance and speed are calculated based on trajectory points.<br/>
-                2. Pattern classification: linear (straight), chaotic (random), mixed.<br/>
-                3. Zones are defined as quadrants of the tracking area.<br/>
+        story.append(Spacer(1, 0.2 * inch))
+
+        notes_text = """
+            <b>Notes:</b><br/>
+            1. Distance and speed are calculated based on trajectory points.<br/>
+            2. Pattern classification: linear (straight), chaotic (random), mixed.<br/>
+            3. Zones are defined as quadrants of the tracking area.<br/>
+            """
+
+        if not knows_real_dimensions:
+            notes_text += """
+                4. Measurements are in pixel units (relative scale).<br/>
+                5. For real-world metrics, provide area dimensions during calibration.<br/>
                 """
 
-            if not knows_real_dimensions:
-                notes_text += """
-                    4. Measurements are in pixel units (relative scale).<br/>
-                    5. For real-world metrics, provide area dimensions during calibration.<br/>
-                    """
+        notes = Paragraph(notes_text, styles["Normal"])
+        story.append(notes)
 
-            notes = Paragraph(notes_text, styles["Normal"])
-            story.append(notes)
-
-            doc.build(story)
+        doc.build(story)
 
     def build_summary_rows(
             self,
