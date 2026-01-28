@@ -8,7 +8,6 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from idlelib.help_about import version
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
